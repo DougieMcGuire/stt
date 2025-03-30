@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, send_file
+from flask import Flask, request, jsonify, send_file
 import os
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -93,88 +93,45 @@ def audio_to_srt(audio_path):
     
     return srt_path
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return render_template('index.html', error='No file part')
-        
-        file = request.files['file']
-        
-        if file.filename == '':
-            return render_template('index.html', error='No selected file')
-        
-        if file:
-            # Generate unique filename
-            original_filename = file.filename
-            file_extension = os.path.splitext(original_filename)[1]
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
-            
-            # Save the uploaded file
-            file.save(file_path)
-            
-            try:
-                # Convert audio to SRT
-                srt_path = audio_to_srt(file_path)
-                
-                # Send the SRT file to user
-                return send_file(
-                    srt_path,
-                    as_attachment=True,
-                    download_name=os.path.basename(srt_path),
-                    mimetype='text/plain'
-                )
-            except Exception as e:
-                return render_template('index.html', error=f"Error processing audio: {str(e)}")
+@app.route('/convert', methods=['POST'])
+def convert_audio():
+    """API endpoint to convert audio file to SRT"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
     
-    return render_template('index.html')
+    file = request.files['file']
+    
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file:
+        # Generate unique filename
+        original_filename = file.filename
+        file_extension = os.path.splitext(original_filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+        
+        # Save the uploaded file
+        file.save(file_path)
+        
+        try:
+            # Convert audio to SRT
+            srt_path = audio_to_srt(file_path)
+            
+            # Return the SRT file
+            return send_file(
+                srt_path,
+                as_attachment=True,
+                download_name=os.path.basename(srt_path),
+                mimetype='text/plain'
+            )
+        except Exception as e:
+            return jsonify({'error': f"Error processing audio: {str(e)}"}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return "Service is running"
-
-# Simple HTML template
-@app.route('/template')
-def template():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Audio to SRT Converter</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 20px;
-            }
-            .container {
-                border: 1px solid #ddd;
-                padding: 20px;
-                border-radius: 5px;
-            }
-            .error {
-                color: red;
-                margin-bottom: 15px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Audio to SRT Converter</h1>
-            <p>Upload an audio file (.mp3, .wav, .caf, etc.) to convert it to SRT subtitle format.</p>
-            {% if error %}
-            <div class="error">{{ error }}</div>
-            {% endif %}
-            <form method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept="audio/*">
-                <button type="submit">Convert to SRT</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    """
+    """Simple health check endpoint"""
+    return jsonify({'status': 'OK'}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
