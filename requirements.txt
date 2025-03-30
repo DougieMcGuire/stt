@@ -1,5 +1,3 @@
 flask
-openai-whisper
-ffmpeg-python
-subprocess
+SpeechRecognition
 pydub
